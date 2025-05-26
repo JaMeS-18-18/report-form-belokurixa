@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Форма отчета</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+      body {
+        background-color: #f6f8fa;
+      }
+
+      form {
+        background: white;
+        max-width: 900px;
+        margin: 2rem auto;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      }
+
+      .employee-block {
+        background: #f9f9f9;
+        padding: 15px;
+        border-left: 4px solid #0d6efd;
+        border-radius: 5px;
+        margin-bottom: 15px;
+      }
+
+      .remove-btn {
+        background: none;
+        border: none;
+        color: red;
+        font-size: 1.4rem;
+        float: right;
+        cursor: pointer;
+      }
+
+      .tag {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        padding: 4px 10px;
+        border-radius: 15px;
+        margin: 3px;
+        display: inline-block;
+      }
+
+      .tag button {
+        background: none;
+        border: none;
+        margin-left: 5px;
+        color: #0c5460;
+        font-weight: bold;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+
+  <body>
+
+    <form id="reportForm" method="POST"
+      action="https://script.google.com/macros/s/AKfycbwCuSTSozXxzkflkE2z8RC6wl5wCzPXcBtck7OHjqtK7JzyyaE3a1RSa6W1hJH5Qv3R/exec"
+      onsubmit="handleSubmit(event)">
+      <div class="d-flex">
+        <h3>1. Общая информация</h3>
+        <button type="button" class="btn btn-sm" onclick="toggleMonthSettings()">
+          <i class="bi bi-gear"></i>
+        </button>
+      </div>
+
+      <div class="mb-3">
+        <label for="monthSelect" class="form-label">Выберите месяц:</label>
+        <div id="monthSettingsPanel" style="display:none;" class="mt-2">
+          <div class="d-flex gap-2 mb-2">
+            <input type="text" id="newMonthInput" class="form-control" placeholder="Новый месяц (пример: Июль)" />
+            <button type="button" class="btn btn-outline-primary" onclick="addNewMonth()">Добавить</button>
+          </div>
+          <div id="savedMonths" class="mb-3"></div>
+        </div>
+        <select id="monthSelect" name="sheetName" class="form-select" required></select>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-4"><label>Дата:</label><input type="date" name="sana" class="form-control" required></div>
+        <div class="col-md-4"><label>Внесения:</label><input type="number" name="vneseniya" class="form-control"
+            required></div>
+        <div class="col-md-4"><label>Со счета:</label><input type="number" name="vneseniyaSchot" class="form-control"
+            required></div>
+        <div class="col-md-4"><label>Расход (прочее):</label><input type="number" name="rasxod" class="form-control"
+            required></div>
+        <div class="col-md-4"><label>Расход чек:</label><input type="number" name="rasxodChek" class="form-control"
+            required></div>
+        <div class="col-md-4"><label>Доставка:</label><input type="number" name="dastavka" class="form-control"
+            required></div>
+        <div class="col-md-4"><label>Наличка:</label><input type="number" name="nalich" class="form-control" required>
+        </div>
+        <div class="col-md-4"><label>Без нал:</label><input type="number" name="bezNal" class="form-control" required>
+        </div>
+        <div class="col-md-4"><label>Копилка:</label><input type="number" name="avans" class="form-control"></div>
+      </div>
+
+      <hr>
+      <div class="d-flex">
+        <h3>2. Работники</h3>
+        <button type="button" class="btn btn-sm fw-bold ms-2" onclick="toggleSettings()"><i
+            class="bi bi-gear"></i></button>
+      </div>
+      <div id="settingsPanel" style="display: none;" class="mt-2 mb-3">
+        <label>Добавить новое имя:</label>
+        <div class="d-flex gap-2 mb-2">
+          <input type="text" id="newNameInput" class="form-control" placeholder="Имя сотрудника" />
+          <button type="button" class="btn btn-outline-primary" onclick="addNewName()">Добавить</button>
+        </div>
+        <div id="savedNames"></div>
+      </div>
+
+      <div id="employeeRows"></div>
+      <button type="button" class="btn btn-outline-primary mt-2" onclick="addEmployeeRow()">+ Добавить
+        работника</button>
+      <br><br>
+      <button type="submit" class="btn btn-primary">Отправить</button>
+    </form>
+
+    <!-- Modal -->
+    <div class="modal fade" id="notifyModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content text-center p-4">
+          <div id="modalSpinner" class="mb-3">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+              <span class="visually-hidden">Загрузка...</span>
+            </div>
+          </div>
+          <div id="modalMessage" class="fs-5">Загрузка...</div>
+        </div>
+      </div>
+    </div>
+
+
+    <script>
+      let employeeCount = 0;
+      let employeeList = [];
+      let monthList = [];
+
+      function toggleSettings() {
+        const panel = document.getElementById("settingsPanel");
+        panel.style.display = panel.style.display === "none" ? "block" : "none";
+      }
+
+      function toggleMonthSettings() {
+        const panel = document.getElementById("monthSettingsPanel");
+        panel.style.display = panel.style.display === "none" ? "block" : "none";
+      }
+
+      function addNewName() {
+        const input = document.getElementById("newNameInput");
+        const name = input.value.trim();
+        if (name && !employeeList.includes(name)) {
+          employeeList.push(name);
+          saveEmployeeList();
+          input.value = '';
+        }
+      }
+
+      function removeName(name) {
+        employeeList = employeeList.filter(n => n !== name);
+        saveEmployeeList();
+      }
+
+      function renderSavedNames() {
+        const savedDiv = document.getElementById("savedNames");
+        savedDiv.innerHTML = '';
+        employeeList.forEach(name => {
+          const tag = document.createElement("span");
+          tag.className = "tag";
+          tag.innerHTML = `${name} <button onclick="removeName('${name}')">&times;</button>`;
+          savedDiv.appendChild(tag);
+        });
+      }
+
+      function saveEmployeeList() {
+        localStorage.setItem('employeeList', JSON.stringify(employeeList));
+        renderSavedNames();
+        updateAllSelects();
+      }
+
+      function updateAllSelects() {
+        const selects = document.querySelectorAll("select[name^='ism_']");
+        selects.forEach(select => {
+          const currentValue = select.value;
+          select.innerHTML = employeeList.map(name => `<option value="${name}">${name}</option>`).join("");
+          select.value = currentValue;
+        });
+      }
+
+      function addEmployeeRow() {
+        employeeCount++;
+        const container = document.getElementById("employeeRows");
+        const div = document.createElement("div");
+        div.className = "employee-block";
+        div.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center">
+        <strong>Работник ${employeeCount}</strong>
+        <button type="button" class="remove-btn" onclick="this.closest('.employee-block').remove()">×</button>
+      </div>
+      <div class="row g-2 mt-2">
+        <div class="col-md-4"><label>Имя:</label><select name="ism_${employeeCount}" class="form-select" required>
+          ${employeeList.map(name => `<option value="${name}">${name}</option>`).join("")}
+        </select></div>
+        <div class="col-md-4"><label>Ставка:</label><input type="number" name="stavka_${employeeCount}" class="form-control" required></div>
+        <div class="col-md-4"><label>Часы:</label><input type="number" name="soat_${employeeCount}" class="form-control" required></div>
+        <div class="col-md-4"><label>Бар:</label><input type="number" name="bar_${employeeCount}" class="form-control" required></div>
+        <div class="col-md-4"><label>Кухня:</label><input type="number" name="kuxniya_${employeeCount}" class="form-control" required></div>
+        <div class="col-md-4"><label>Аванс/з.п:</label><input type="number" name="avans_${employeeCount}" class="form-control" required></div>
+      </div>`;
+        container.appendChild(div);
+      }
+
+      function addNewMonth() {
+        const input = document.getElementById("newMonthInput");
+        const month = input.value.trim();
+        if (month && !monthList.includes(month)) {
+          monthList.push(month);
+          saveMonthList();
+          input.value = '';
+        }
+      }
+
+      function removeMonth(month) {
+        monthList = monthList.filter(m => m !== month);
+        saveMonthList();
+      }
+
+      function renderSavedMonths() {
+        const container = document.getElementById("savedMonths");
+        container.innerHTML = '';
+        monthList.forEach(month => {
+          const tag = document.createElement("span");
+          tag.className = "tag";
+          tag.innerHTML = `${month} <button onclick="removeMonth('${month}')">&times;</button>`;
+          container.appendChild(tag);
+        });
+      }
+
+      function saveMonthList() {
+        localStorage.setItem('monthList', JSON.stringify(monthList));
+        renderMonthSelect();
+        renderSavedMonths();
+      }
+
+      function renderMonthSelect() {
+        const select = document.getElementById("monthSelect");
+        select.innerHTML = "";
+        const selected = localStorage.getItem("selectedMonth");
+        monthList.forEach(month => {
+          const option = document.createElement("option");
+          option.value = month;
+          option.textContent = month;
+          if (month === selected) option.selected = true;
+          select.appendChild(option);
+        });
+      }
+      function handleSubmit(event) {
+        event.preventDefault();
+        const form = document.getElementById('reportForm');
+        const formData = new FormData(form);
+        const selectedMonth = document.getElementById("monthSelect").value;
+        localStorage.setItem("selectedMonth", selectedMonth);
+
+        const modal = new bootstrap.Modal(document.getElementById('notifyModal'));
+        document.getElementById('modalSpinner').style.display = 'block';
+        document.getElementById('modalMessage').textContent = "Отправка...";
+        modal.show();
+
+        fetch(form.action, {
+          method: 'POST',
+          body: formData,
+        })
+          .then(res => res.text())
+          .then(text => {
+            const messageEl = document.getElementById('modalMessage');
+            const spinner = document.getElementById('modalSpinner');
+
+            spinner.style.display = 'none';
+            if (text.trim() === "OK") {
+              messageEl.innerHTML = `<i class="bi bi-check-circle-fill text-success fs-2"></i><br>Успешно отправлено!`;
+
+              // 🔁 Forma tozalash
+              form.reset();
+
+              // 🔁 Oy tanlovini qayta render qilish (resetdan keyin tanlash uchun)
+              renderMonthSelect();
+
+              // 🔁 Ishchilar bo‘limini tozalab yangisini qo‘shamiz
+              document.getElementById("employeeRows").innerHTML = "";
+              employeeCount = 0;
+              addEmployeeRow();
+
+              // 🔝 Scroll yuqoriga
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+              messageEl.innerHTML = `<i class="bi bi-exclamation-triangle-fill text-danger fs-2"></i><br>Ошибка: ${text}`;
+            }
+
+            setTimeout(() => modal.hide(), 3000);
+          })
+          .catch(err => {
+            document.getElementById('modalSpinner').style.display = 'none';
+            document.getElementById('modalMessage').innerHTML = `
+      <i class="bi bi-x-circle-fill text-danger fs-2"></i><br>
+      Ошибка отправки: ${err.message}`;
+          });
+      }
+
+      function loadEmployeeList() {
+        const saved = localStorage.getItem('employeeList');
+        employeeList = saved ? JSON.parse(saved) : ["Анна", "Кристина", "Рома", "Настя", "Андрей"];
+        renderSavedNames();
+      }
+
+      function loadMonthList() {
+        const saved = localStorage.getItem("monthList");
+        monthList = saved ? JSON.parse(saved) : ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь"];
+        renderMonthSelect();
+        renderSavedMonths();
+      }
+
+      // Init
+      loadEmployeeList();
+      loadMonthList();
+      addEmployeeRow();
+    </script>
+  </body>
+
+</html>
